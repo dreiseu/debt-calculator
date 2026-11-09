@@ -101,6 +101,15 @@ create index debts_user_idx on public.debts (user_id);
 create index payments_user_idx on public.payments (user_id);
 create index payments_debt_idx on public.payments (debt_id);
 
+-- Signed-in users reach these tables through the Data API; anonymous visitors don't.
+-- Explicit so it works even when "automatically expose new tables" is off.
+grant select, insert, update, delete
+  on public.profiles, public.budget_items, public.future_incomes, public.debts, public.payments
+  to authenticated;
+revoke all
+  on public.profiles, public.budget_items, public.future_incomes, public.debts, public.payments
+  from anon;
+
 -- Row-level security: each user can only see and change their own rows.
 do $$
 declare
