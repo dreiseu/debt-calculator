@@ -1,26 +1,96 @@
 @import "tailwindcss";
 
+/*
+ * Palette drawn from Philippine banknotes. Each accent carries one meaning:
+ * indigo = structure, mint = money available / paid down,
+ * ochre = minimum dues, berry = interest, fees and warnings.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --paper: #f4f6f3;
+  --surface: #ffffff;
+  --ink: #1c2230;
+  --ink-muted: #5b6475;
+  --line: #dde2da;
+  --indigo: #1f2a5a;
+  --indigo-soft: #e7eaf4;
+  --mint: #2e8b6e;
+  --mint-soft: #e1f0e9;
+  --ochre: #9a6f05;
+  --ochre-soft: #f6edd5;
+  --berry: #a8324f;
+  --berry-soft: #f5e1e6;
+  /* Chart series, validated for colorblind separation against --paper. */
+  --chart-future: #109e74;
+  --chart-current: #4058c8;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #12161f;
+    --surface: #1a2030;
+    --ink: #e8ebf0;
+    --ink-muted: #9aa3b5;
+    --line: #2c3445;
+    --indigo: #a9b7f2;
+    --indigo-soft: #232c48;
+    --mint: #5cc29e;
+    --mint-soft: #173328;
+    --ochre: #e0b44a;
+    --ochre-soft: #3a2f12;
+    --berry: #e57a93;
+    --berry-soft: #3d1c26;
+    --chart-future: #26a67d;
+    --chart-current: #5b70e0;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-indigo: var(--indigo);
+  --color-indigo-soft: var(--indigo-soft);
+  --color-mint: var(--mint);
+  --color-mint-soft: var(--mint-soft);
+  --color-ochre: var(--ochre);
+  --color-ochre-soft: var(--ochre-soft);
+  --color-berry: var(--berry);
+  --color-berry-soft: var(--berry-soft);
+  --font-sans: var(--font-public-sans);
+  --font-display: var(--font-bricolage);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-public-sans), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* The one celebratory moment: a debt reaching zero. */
+@keyframes celebrate {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
