@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Utang Tracker
 
-## Getting Started
+A debt calculator and payoff planner for Filipino credit card and lending-app debt. Enter your
+income, expenses, credit cards and loans to see what's left after each payment, which debt to pay
+first (Avalanche or Snowball), and the month you'll be debt-free.
 
-First, run the development server:
+- **Three debt types:** credit cards and credit lines (monthly interest on the balance), fixed
+  installments (BillEase, SLoan), and add-on rate loans, with the real monthly rate revealed
+- **What-if calculator:** pay any amount and see interest, late fees and what's left
+- **Payoff plan:** Avalanche vs Snowball, payoff timeline, and a debt-over-time chart that includes
+  future income like 13th month pay and raises
+- **Progress tracking:** payment log, milestones, emergency fund goal
+- **Guest mode or account:** works instantly in the browser; sign up to save to Supabase
+
+Built with Next.js, TypeScript, Tailwind CSS, Supabase (Postgres + Auth) and Vitest. All money math
+runs in integer centavos.
+
+## Run it locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. Without Supabase keys the app runs in guest mode and saves to the
+browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm test
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Connect Supabase (accounts and cloud saving)
 
-## Learn More
+1. Create a free project at [supabase.com](https://supabase.com/dashboard).
+2. In the project, open **SQL Editor**, paste the contents of
+   [`supabase/migrations/20261109000000_init.sql`](supabase/migrations/20261109000000_init.sql) and
+   click **Run**. This creates the tables and row-level security policies.
+3. Open **Authentication → Sign In / Providers → Email** and turn off **Confirm email**. Supabase's
+   built-in email service only delivers to your own team's addresses, so confirmation emails would
+   never reach other users. (To keep confirmation on, set up custom SMTP first.)
+4. Open **Authentication → URL Configuration** and set **Site URL** to `http://localhost:3000`
+   (change it to your Vercel URL when you deploy).
+5. Open **Project Settings → API Keys** and copy the **Project URL** and the **publishable key**
+   into `.env.local`:
 
-To learn more about Next.js, take a look at the following resources:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   The legacy `anon` key works too. Never put the `service_role` or secret key here.
+6. Restart `npm run dev`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Local Supabase instead (optional)
 
-## Deploy on Vercel
+With Docker running, `npx supabase start` runs Supabase on your machine and applies the migration.
+Use the API URL and publishable key it prints.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## How the data is stored
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Table | What it holds |
+|---|---|
+| `profiles` | Emergency fund saved and goal |
+| `budget_items` | Monthly income and expenses |
+| `future_incomes` | One-time, monthly and yearly future income |
+| `debts` | Credit cards and loans; check constraints require the right fields for each kind |
+| `payments` | Logged payments, linked to a debt the same user owns |
+
+Every table has row-level security so users only ever see their own rows. The app saves only the
+rows that changed, shortly after you stop typing.

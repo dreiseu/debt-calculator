@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Public_Sans } from "next/font/google";
+import { LoadError } from "@/components/account-status";
 import { FinanceProvider } from "@/components/finance-provider";
 import { Nav } from "@/components/nav";
 import "./globals.css";
@@ -31,7 +32,10 @@ export default function RootLayout({
           <div className="md:flex md:min-h-screen">
             <Nav />
             <main className="flex-1 px-4 pt-6 pb-28 md:px-12 md:py-12">
-              <div className="mx-auto max-w-4xl">{children}</div>
+              <div className="mx-auto max-w-4xl">
+                <LoadError />
+                {children}
+              </div>
             </main>
           </div>
         </FinanceProvider>

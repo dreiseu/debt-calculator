@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AccountStatus } from "./account-status";
 
 const links = [
   { href: "/", label: "Overview", icon: "M3 12l9-8 9 8M5 10v10h14V10" },
@@ -20,10 +21,11 @@ export function Nav() {
 
   return (
     <>
-      <header className="px-4 pt-5 md:hidden">
+      <header className="flex items-center justify-between gap-4 px-4 pt-5 md:hidden">
         <Link href="/" className="font-display text-lg font-bold tracking-tight text-indigo">
           Utang Tracker
         </Link>
+        <AccountStatus compact />
       </header>
 
       <nav
@@ -68,6 +70,9 @@ export function Nav() {
             );
           })}
         </ul>
+        <div className="mt-10 hidden border-t border-line pt-5 md:block">
+          <AccountStatus />
+        </div>
       </nav>
     </>
   );

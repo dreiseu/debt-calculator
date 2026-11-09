@@ -76,3 +76,23 @@ export function milestones(data: FinanceData): Milestone[] {
     { id: "debt-free", label: "Debt-free", reached: hasDebts && original > 0 && remaining === 0 },
   ];
 }
+
+/**
+ * Copy of the data with every id replaced by a fresh UUID (and payment links
+ * updated to match). Used when sample or guest data moves into an account,
+ * where ids must be unique across all users.
+ */
+export function withFreshIds(data: FinanceData): FinanceData {
+  const debtIds = new Map(data.debts.map((d) => [d.id, newId()]));
+  const fresh = <T extends { id: string }>(items: T[]) => items.map((i) => ({ ...i, id: newId() }));
+  return {
+    ...data,
+    incomes: fresh(data.incomes),
+    expenses: fresh(data.expenses),
+    futureIncome: fresh(data.futureIncome),
+    debts: data.debts.map((d) => ({ ...d, id: debtIds.get(d.id)! })),
+    payments: data.payments
+      .filter((p) => debtIds.has(p.debtId))
+      .map((p) => ({ ...p, id: newId(), debtId: debtIds.get(p.debtId)! })),
+  };
+}

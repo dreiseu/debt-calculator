@@ -35,7 +35,7 @@ function Welcome() {
 }
 
 export default function OverviewPage() {
-  const { data, ready, replace } = useFinance();
+  const { data, ready, replace, email } = useFinance();
   const [confirmClear, setConfirmClear] = useState(false);
   if (!ready) return null;
   if (data.debts.length === 0 && data.incomes.length === 0) return <Welcome />;
@@ -165,7 +165,7 @@ export default function OverviewPage() {
       <footer className="mt-16 border-t border-line pt-5 text-sm">
         {confirmClear ? (
           <div className="flex flex-wrap items-center gap-3">
-            <span>Delete everything you&apos;ve entered on this device?</span>
+            <span>{email ? "Delete everything saved in your account?" : "Delete everything you've entered on this device?"}</span>
             <Button
               variant="danger"
               className="border border-berry"
