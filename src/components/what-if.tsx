@@ -10,6 +10,7 @@ import {
   type Debt,
 } from "@/lib/debt";
 import { planMonthDate } from "@/lib/finance/future";
+import { formatIsoDate, startMonthsFor, startsLater } from "@/lib/finance/schedule";
 import { formatMonthYear } from "@/lib/finance/summary";
 import { Field, MoneyInput, Notice, Peso } from "./ui";
 
@@ -26,9 +27,11 @@ export function WhatIf({ debt }: { debt: Debt }) {
   const [payment, setPayment] = useState<number | undefined>(minDue);
   const amount = payment ?? 0;
 
+  const later = startsLater(debt);
+  const startMonths = startMonthsFor([debt]);
   const thisMonth = projectNextMonth(debt, amount);
-  const everyMonth = simulatePayoff([debt], { strategy: "avalanche", monthlyBudget: amount });
-  const minimumOnly = simulatePayoff([debt], { strategy: "avalanche", monthlyBudget: "minimum" });
+  const everyMonth = simulatePayoff([debt], { strategy: "avalanche", monthlyBudget: amount, startMonths });
+  const minimumOnly = simulatePayoff([debt], { strategy: "avalanche", monthlyBudget: "minimum", startMonths });
   const interestSaved = minimumOnly.totalInterest - everyMonth.totalInterest;
 
   const chip = (label: string, value: number) => (
@@ -47,7 +50,7 @@ export function WhatIf({ debt }: { debt: Debt }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="max-w-xs">
-        <Field label="If I pay">
+        <Field label={later ? `If my first payment on ${formatIsoDate(debt.firstPaymentDate!)} is` : "If I pay"}>
           {(id) => <MoneyInput id={id} value={payment} onChange={setPayment} />}
         </Field>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -66,7 +69,7 @@ export function WhatIf({ debt }: { debt: Debt }) {
           <dd><Peso amount={thisMonth.lateFee} tone={thisMonth.lateFee ? "berry" : "ink"} className="font-semibold" /></dd>
         </div>
         <div className="col-span-2">
-          <dt className="text-sm text-ink-muted">Left to pay next month</dt>
+          <dt className="text-sm text-ink-muted">{later ? "Left after this payment" : "Left to pay next month"}</dt>
           <dd><Peso amount={thisMonth.endBalance} className="font-display text-2xl font-semibold" /></dd>
         </div>
       </dl>

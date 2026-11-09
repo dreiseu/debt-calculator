@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { withFreshIds } from "@/lib/finance/progress";
+import { catchUpScheduledPayments } from "@/lib/finance/schedule";
 import { emptyFinanceData, type FinanceData } from "@/lib/finance/types";
 import { getSupabase } from "@/lib/supabase/client";
 import { diffRows, emptyRows, fromRows, hasChanges, toRows, type Rows } from "@/lib/supabase/rows";
@@ -157,7 +158,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     setLoadError(null);
 
     if (account === null) {
-      const local = loadLocal();
+      const saved = loadLocal();
+      // Installments whose due date passed since the last visit count as paid.
+      const local = catchUpScheduledPayments(saved);
+      if (local !== saved) saveLocal(local);
       latest.current = local;
       synced.current = emptyRows;
       setData(local);
@@ -174,8 +178,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       try {
         const rows = await loadRows(supabase!);
         if (cancelled) return;
-        const remote = fromRows(rows);
-        const guest = loadLocal();
+        const remote = catchUpScheduledPayments(fromRows(rows));
+        const guest = catchUpScheduledPayments(loadLocal());
         synced.current = rows;
 
         if (isEmpty(remote) && !isEmpty(guest)) {
@@ -191,6 +195,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           latest.current = remote;
           setData(remote);
           setReady(true);
+          if (hasChanges(diffRows(rows, toRows(remote)))) schedule(SAVE_DELAY_MS);
         }
       } catch (error) {
         if (cancelled) return;
@@ -203,7 +208,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [account, supabase, save]);
+  }, [account, supabase, save, schedule]);
 
   // Warn before leaving with unsaved edits.
   useEffect(() => {

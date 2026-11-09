@@ -125,4 +125,30 @@ describe("simulatePayoff", () => {
     expect(withBonus.monthsToDebtFree!).toBeLessThan(steady.monthsToDebtFree!);
     expect(withBonus.totalInterest).toBeLessThan(steady.totalInterest);
   });
+
+  it("leaves a debt untouched until its start month", () => {
+    const later = { ...card("later", 10_000, 0.03) };
+    const result = simulatePayoff([later, installment], {
+      strategy: "avalanche",
+      monthlyBudget: toCentavos(3_000),
+      startMonths: { later: 3 },
+    });
+    expect(result.months[0].debts.map((d) => d.debtId)).toEqual(["billease"]);
+    expect(result.months[1].debts.map((d) => d.debtId)).toEqual(["billease"]);
+    // No interest accrues before it starts
+    expect(result.months[2].debts.find((d) => d.debtId === "later")!.startBalance).toBe(toCentavos(10_000));
+    expect(result.totalLateFees).toBe(0);
+    expect(result.monthsToDebtFree).not.toBeNull();
+  });
+
+  it("keeps counting months while only a not-yet-started debt is left", () => {
+    const result = simulatePayoff([card("later", 1_000, 0.03)], {
+      strategy: "avalanche",
+      monthlyBudget: toCentavos(5_000),
+      startMonths: { later: 4 },
+    });
+    expect(result.monthsToDebtFree).toBe(4);
+    expect(result.payoffMonth.later).toBe(4);
+    expect(result.months[0].debts).toHaveLength(0);
+  });
 });

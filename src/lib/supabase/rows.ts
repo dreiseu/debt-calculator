@@ -38,6 +38,7 @@ export interface DebtRow {
   due_day: number | null;
   late_fee: number;
   original_balance: number | null;
+  first_payment_date: string | null;
   position: number;
   balance: number | null;
   monthly_interest_rate: number | null;
@@ -46,6 +47,7 @@ export interface DebtRow {
   minimum_due_override: number | null;
   installment_amount: number | null;
   installments_remaining: number | null;
+  total_installments: number | null;
   principal: number | null;
   monthly_add_on_rate: number | null;
   term_months: number | null;
@@ -79,6 +81,7 @@ const emptyDebtColumns = {
   minimum_due_override: null,
   installment_amount: null,
   installments_remaining: null,
+  total_installments: null,
   principal: null,
   monthly_add_on_rate: null,
   term_months: null,
@@ -94,6 +97,7 @@ export function debtToRow(debt: Debt, position: number): DebtRow {
     due_day: debt.dueDay ?? null,
     late_fee: debt.lateFee,
     original_balance: debt.originalBalance ?? null,
+    first_payment_date: debt.firstPaymentDate ?? null,
     position,
     ...emptyDebtColumns,
   };
@@ -112,6 +116,7 @@ export function debtToRow(debt: Debt, position: number): DebtRow {
         ...common,
         installment_amount: debt.installmentAmount,
         installments_remaining: debt.installmentsRemaining,
+        total_installments: debt.totalInstallments ?? null,
         paid_ahead: debt.paidAhead ?? null,
       };
     case "add_on":
@@ -135,6 +140,7 @@ export function rowToDebt(row: DebtRow): Debt {
     dueDay: optional(row.due_day),
     lateFee: row.late_fee,
     originalBalance: optional(row.original_balance),
+    firstPaymentDate: optional(row.first_payment_date),
   };
   switch (row.kind) {
     case "revolving":
@@ -153,6 +159,7 @@ export function rowToDebt(row: DebtRow): Debt {
         kind: "installment",
         installmentAmount: row.installment_amount!,
         installmentsRemaining: row.installments_remaining!,
+        totalInstallments: optional(row.total_installments),
         paidAhead: optional(row.paid_ahead),
       };
     case "add_on":

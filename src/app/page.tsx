@@ -8,6 +8,7 @@ import { initialBalance, simulatePayoff } from "@/lib/debt";
 import { milestones, overallProgress } from "@/lib/finance/progress";
 import { sampleFinanceData } from "@/lib/finance/sample";
 import { budgetWithFutureIncome, planMonthDate } from "@/lib/finance/future";
+import { startMonthsFor } from "@/lib/finance/schedule";
 import { formatMonthYear, summarize, upcomingDueDates } from "@/lib/finance/summary";
 import { emptyFinanceData } from "@/lib/finance/types";
 
@@ -48,6 +49,7 @@ export default function OverviewPage() {
     ? simulatePayoff(activeDebts, {
         strategy: "avalanche",
         monthlyBudget: budgetWithFutureIncome(budget, data.futureIncome),
+        startMonths: startMonthsFor(activeDebts),
       })
     : null;
   const upcoming = upcomingDueDates(data.debts, new Date()).slice(0, 4);

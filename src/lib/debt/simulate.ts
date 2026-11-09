@@ -20,6 +20,11 @@ export interface SimulationOptions {
   monthlyBudget: MonthlyBudget;
   /** Safety stop; a plan that hasn't finished by then is reported as never paying off. */
   maxMonths?: number;
+  /**
+   * Plan month in which each debt's first payment falls (default 1). Before
+   * it the debt sits untouched: nothing due, no payments, no interest.
+   */
+  startMonths?: Record<string, number>;
 }
 
 export interface SimulatedMonth {
@@ -52,10 +57,11 @@ function priorityOrder(
   debts: Debt[],
   states: Map<string, DebtState>,
   strategy: Strategy,
+  isActive: (d: Debt) => boolean,
 ): Debt[] {
   const balance = (d: Debt) => states.get(d.id)!.balance;
   return debts
-    .filter((d) => balance(d) > 0)
+    .filter((d) => balance(d) > 0 && isActive(d))
     .sort((a, b) => {
       if (strategy === "avalanche") {
         const byRate = prepaymentSavingsRate(b) - prepaymentSavingsRate(a);
@@ -79,13 +85,16 @@ export function simulatePayoff(debts: Debt[], options: SimulationOptions): Simul
     payoffMonth[d.id] = states.get(d.id)!.balance > 0 ? null : 0;
   }
 
-  for (let month = 1; month <= maxMonths; month++) {
-    const order = priorityOrder(debts, states, options.strategy);
-    if (order.length === 0) break;
+  const startOf = (d: Debt) => Math.max(1, options.startMonths?.[d.id] ?? 1);
 
-    const isFirstMonth = month === 1;
+  for (let month = 1; month <= maxMonths; month++) {
+    if ([...states.values()].every((s) => s.balance <= 0)) break;
+
+    const isActive = (d: Debt) => startOf(d) <= month;
+    const isFirstMonth = (d: Debt) => startOf(d) === month;
+    const order = priorityOrder(debts, states, options.strategy, isActive);
     const mins = new Map(
-      order.map((d) => [d.id, minimumDue(d, states.get(d.id)!, isFirstMonth)]),
+      order.map((d) => [d.id, minimumDue(d, states.get(d.id)!, isFirstMonth(d))]),
     );
     const totalMinimum = [...mins.values()].reduce((sum, m) => sum + m, 0);
     const budget = options.monthlyBudget;
@@ -116,8 +125,8 @@ export function simulatePayoff(debts: Debt[], options: SimulationOptions): Simul
     const debtMonths: DebtMonth[] = [];
     for (const d of debts) {
       const state = states.get(d.id)!;
-      if (state.balance <= 0) continue;
-      const { month: result, next } = stepDebt(d, state, payments.get(d.id) ?? 0, isFirstMonth);
+      if (state.balance <= 0 || !isActive(d)) continue;
+      const { month: result, next } = stepDebt(d, state, payments.get(d.id) ?? 0, isFirstMonth(d));
       states.set(d.id, next);
       debtMonths.push(result);
       totalPaid += result.payment;
@@ -155,10 +164,11 @@ export function simulatePayoff(debts: Debt[], options: SimulationOptions): Simul
 export function compareStrategies(
   debts: Debt[],
   monthlyBudget: Exclude<MonthlyBudget, "minimum">,
+  startMonths?: Record<string, number>,
 ) {
   return {
-    avalanche: simulatePayoff(debts, { strategy: "avalanche", monthlyBudget }),
-    snowball: simulatePayoff(debts, { strategy: "snowball", monthlyBudget }),
-    minimumOnly: simulatePayoff(debts, { strategy: "avalanche", monthlyBudget: "minimum" }),
+    avalanche: simulatePayoff(debts, { strategy: "avalanche", monthlyBudget, startMonths }),
+    snowball: simulatePayoff(debts, { strategy: "snowball", monthlyBudget, startMonths }),
+    minimumOnly: simulatePayoff(debts, { strategy: "avalanche", monthlyBudget: "minimum", startMonths }),
   };
 }

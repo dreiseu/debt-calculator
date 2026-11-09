@@ -12,6 +12,7 @@ import {
   type Debt,
 } from "@/lib/debt";
 import { newId } from "@/lib/finance/progress";
+import { formatIsoDate, parseIsoDate, paymentsDueSoFar } from "@/lib/finance/schedule";
 import { Button, Field, MoneyInput, Notice, PercentInput, TextInput } from "./ui";
 
 type Kind = Debt["kind"];
@@ -33,6 +34,7 @@ interface Draft {
   kind: Kind;
   name: string;
   dueDay?: number;
+  firstPaymentDate?: string;
   lateFee?: number;
   balance?: number;
   monthlyInterestRate?: number;
@@ -41,6 +43,7 @@ interface Draft {
   minimumDueOverride?: number;
   installmentAmount?: number;
   installmentsRemaining?: number;
+  totalInstallments?: number;
   principal?: number;
   monthlyAddOnRate?: number;
   termMonths?: number;
@@ -71,8 +74,11 @@ function build(draft: Draft, id: string, existing?: Debt): Debt | string {
     id,
     name: draft.name.trim(),
     dueDay: draft.dueDay,
+    firstPaymentDate: draft.firstPaymentDate || undefined,
     lateFee: draft.lateFee ?? 0,
   };
+  // With a first payment date, installments whose due date has passed count as paid.
+  const dueSoFar = base.firstPaymentDate ? paymentsDueSoFar(base.firstPaymentDate) : 0;
 
   let debt: Debt;
   switch (draft.kind) {
@@ -89,38 +95,67 @@ function build(draft: Draft, id: string, existing?: Debt): Debt | string {
         minimumDueOverride: draft.minimumDueOverride,
       };
       break;
-    case "installment":
+    case "installment": {
       if (!draft.installmentAmount) return "Enter the monthly installment.";
-      if (!draft.installmentsRemaining) return "Enter how many installments are left.";
-      debt = {
-        ...base,
-        kind: "installment",
-        installmentAmount: draft.installmentAmount,
-        installmentsRemaining: Math.round(draft.installmentsRemaining),
-        paidAhead: existing?.kind === "installment" ? existing.paidAhead : undefined,
-      };
+      const before = existing?.kind === "installment" ? existing : undefined;
+      if (base.firstPaymentDate) {
+        if (!draft.totalInstallments) return "Enter the total number of installments.";
+        const total = Math.round(draft.totalInstallments);
+        let left = Math.max(0, total - dueSoFar);
+        // Keep payments logged ahead of schedule.
+        if (before?.totalInstallments === total) left = Math.min(left, before.installmentsRemaining);
+        debt = {
+          ...base,
+          kind: "installment",
+          installmentAmount: draft.installmentAmount,
+          installmentsRemaining: left,
+          totalInstallments: total,
+          paidAhead: left === before?.installmentsRemaining ? before.paidAhead : undefined,
+        };
+      } else {
+        if (!draft.installmentsRemaining) return "Enter how many installments are left.";
+        debt = {
+          ...base,
+          kind: "installment",
+          installmentAmount: draft.installmentAmount,
+          installmentsRemaining: Math.round(draft.installmentsRemaining),
+          paidAhead: before?.paidAhead,
+        };
+      }
       break;
+    }
     case "add_on":
       if (!draft.principal) return "Enter the amount you borrowed.";
       if (draft.monthlyAddOnRate === undefined) return "Enter the monthly add-on rate.";
       if (!draft.termMonths) return "Enter the loan term in months.";
-      if ((draft.monthsPaid ?? 0) > draft.termMonths) {
+      if (!base.firstPaymentDate && (draft.monthsPaid ?? 0) > draft.termMonths) {
         return "Months paid can't be more than the term.";
       }
+      const term = Math.round(draft.termMonths);
+      const before = existing?.kind === "add_on" ? existing : undefined;
+      const monthsPaid = base.firstPaymentDate
+        ? Math.min(term, Math.max(dueSoFar, before?.termMonths === term ? before.monthsPaid : 0))
+        : Math.round(draft.monthsPaid ?? 0);
       debt = {
         ...base,
         kind: "add_on",
         principal: draft.principal,
         monthlyAddOnRate: draft.monthlyAddOnRate,
-        termMonths: Math.round(draft.termMonths),
-        monthsPaid: Math.round(draft.monthsPaid ?? 0),
-        paidAhead: existing?.kind === "add_on" ? existing.paidAhead : undefined,
+        termMonths: term,
+        monthsPaid,
+        paidAhead: monthsPaid === before?.monthsPaid ? before.paidAhead : undefined,
       };
       break;
   }
 
-  const balance = initialBalance(debt);
-  debt.originalBalance = Math.max(existing?.originalBalance ?? 0, balance);
+  // Progress counts from the full loan when its schedule is known.
+  const fullAmount =
+    debt.kind === "installment" && debt.totalInstallments
+      ? debt.installmentAmount * debt.totalInstallments
+      : debt.kind === "add_on" && debt.firstPaymentDate
+        ? addOnMonthlyPayment(debt) * debt.termMonths
+        : 0;
+  debt.originalBalance = Math.max(existing?.originalBalance ?? 0, initialBalance(debt), fullAmount);
   return debt;
 }
 
@@ -212,6 +247,23 @@ export function DebtForm({
             />
           )}
         </Field>
+        <Field
+          label="First payment date"
+          hint={
+            draft.firstPaymentDate && parseIsoDate(draft.firstPaymentDate) > new Date()
+              ? "Nothing is due before this date, and your plan starts paying it then."
+              : "Optional. When the first payment is or was due."
+          }
+        >
+          {(id) => (
+            <TextInput
+              id={id}
+              type="date"
+              value={draft.firstPaymentDate ?? ""}
+              onChange={(e) => set({ firstPaymentDate: e.target.value || undefined })}
+            />
+          )}
+        </Field>
       </div>
 
       {draft.kind === "revolving" && (
@@ -284,19 +336,42 @@ export function DebtForm({
               />
             )}
           </Field>
-          <Field label="Installments left">
-            {(id) => (
-              <TextInput
-                id={id}
-                inputMode="numeric"
-                value={draft.installmentsRemaining ?? ""}
-                onChange={(e) => {
-                  const n = parseInt(e.target.value, 10);
-                  set({ installmentsRemaining: Number.isNaN(n) ? undefined : n });
-                }}
-              />
-            )}
-          </Field>
+          {draft.firstPaymentDate ? (
+            <Field
+              label="Total installments"
+              hint={
+                previewDebt?.kind === "installment"
+                  ? `${previewDebt.installmentsRemaining} left. Passed due dates count as paid.`
+                  : "The full number of months, e.g. 12."
+              }
+            >
+              {(id) => (
+                <TextInput
+                  id={id}
+                  inputMode="numeric"
+                  value={draft.totalInstallments ?? ""}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    set({ totalInstallments: Number.isNaN(n) ? undefined : n });
+                  }}
+                />
+              )}
+            </Field>
+          ) : (
+            <Field label="Installments left">
+              {(id) => (
+                <TextInput
+                  id={id}
+                  inputMode="numeric"
+                  value={draft.installmentsRemaining ?? ""}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    set({ installmentsRemaining: Number.isNaN(n) ? undefined : n });
+                  }}
+                />
+              )}
+            </Field>
+          )}
           <Field label="Late payment fee">
             {(id) => <MoneyInput id={id} value={draft.lateFee} onChange={(lateFee) => set({ lateFee })} />}
           </Field>
@@ -331,19 +406,29 @@ export function DebtForm({
               />
             )}
           </Field>
-          <Field label="Months already paid">
-            {(id) => (
-              <TextInput
-                id={id}
-                inputMode="numeric"
-                value={draft.monthsPaid ?? ""}
-                onChange={(e) => {
-                  const n = parseInt(e.target.value, 10);
-                  set({ monthsPaid: Number.isNaN(n) ? undefined : n });
-                }}
-              />
-            )}
-          </Field>
+          {draft.firstPaymentDate ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium">Months already paid</span>
+              <p className="py-2 text-ink">
+                {previewDebt?.kind === "add_on" ? previewDebt.monthsPaid : "–"}
+              </p>
+              <p className="text-xs text-ink-muted">Counted from the first payment date.</p>
+            </div>
+          ) : (
+            <Field label="Months already paid">
+              {(id) => (
+                <TextInput
+                  id={id}
+                  inputMode="numeric"
+                  value={draft.monthsPaid ?? ""}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    set({ monthsPaid: Number.isNaN(n) ? undefined : n });
+                  }}
+                />
+              )}
+            </Field>
+          )}
           <Field label="Late payment fee">
             {(id) => <MoneyInput id={id} value={draft.lateFee} onChange={(lateFee) => set({ lateFee })} />}
           </Field>
@@ -365,7 +450,9 @@ export function DebtForm({
       {previewDebt && (
         <p className="text-sm text-ink-muted">
           Remaining: <strong className="text-ink">{formatPeso(initialBalance(previewDebt))}</strong>,
-          due this month:{" "}
+          {previewDebt.firstPaymentDate && parseIsoDate(previewDebt.firstPaymentDate) > new Date()
+            ? `first payment on ${formatIsoDate(previewDebt.firstPaymentDate)}: `
+            : "due this month: "}
           <strong className="text-ochre">
             {formatPeso(minimumDue(previewDebt, initialState(previewDebt), true))}
           </strong>

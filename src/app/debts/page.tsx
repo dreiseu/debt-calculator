@@ -5,9 +5,10 @@ import { useState } from "react";
 import { DebtForm, kindLabels } from "@/components/debt-form";
 import { useFinance } from "@/components/finance-provider";
 import { Button, EmptyState, PageHeader, Peso, ProgressMeter } from "@/components/ui";
-import { initialBalance, initialState, minimumDue } from "@/lib/debt";
+import { initialBalance } from "@/lib/debt";
 import { debtProgress } from "@/lib/finance/progress";
-import { ordinal, summarize } from "@/lib/finance/summary";
+import { formatIsoDate, startsLater } from "@/lib/finance/schedule";
+import { dueThisMonth, ordinal, summarize } from "@/lib/finance/summary";
 
 export default function DebtsPage() {
   const { data, ready, update } = useFinance();
@@ -76,7 +77,13 @@ export default function DebtsPage() {
                 <div className="text-right">
                   <Peso amount={progress.remaining} className="font-display text-lg font-semibold" />
                   <p className="text-sm text-ink-muted">
-                    <Peso amount={minimumDue(debt, initialState(debt), true)} tone="ochre" /> due
+                    {startsLater(debt) ? (
+                      `Starts ${formatIsoDate(debt.firstPaymentDate!)}`
+                    ) : (
+                      <>
+                        <Peso amount={dueThisMonth(debt)} tone="ochre" /> due
+                      </>
+                    )}
                   </p>
                 </div>
                 <div className="col-span-2 flex items-center gap-3">

@@ -1,17 +1,19 @@
 import { initialBalance, initialState, minimumDue, type Debt } from "@/lib/debt";
+import { parseIsoDate, startsLater } from "./schedule";
 import type { FinanceData, LineItem } from "./types";
 
 const sum = (items: LineItem[]) => items.reduce((total, item) => total + item.amount, 0);
 
-export function summarize(data: FinanceData) {
+/** Minimum due this month; zero for debts whose first payment is in a later month. */
+export const dueThisMonth = (debt: Debt, today: Date = new Date()) =>
+  startsLater(debt, today) ? 0 : minimumDue(debt, initialState(debt), true);
+
+export function summarize(data: FinanceData, today: Date = new Date()) {
   const totalIncome = sum(data.incomes);
   const totalExpenses = sum(data.expenses);
   const availableForDebt = totalIncome - totalExpenses;
   const totalDebt = data.debts.reduce((total, d) => total + initialBalance(d), 0);
-  const totalMinimumDue = data.debts.reduce(
-    (total, d) => total + minimumDue(d, initialState(d), true),
-    0,
-  );
+  const totalMinimumDue = data.debts.reduce((total, d) => total + dueThisMonth(d, today), 0);
 
   return {
     totalIncome,
@@ -48,13 +50,18 @@ export function nextDueDate(dueDay: number, today: Date): Date {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Debts with a due day, soonest first. */
+/**
+ * Debts with a due day or first payment date, soonest first. A debt that
+ * hasn't started yet shows its first payment date.
+ */
 export function upcomingDueDates(debts: Debt[], today: Date) {
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   return debts
-    .filter((d) => d.dueDay !== undefined && initialBalance(d) > 0)
+    .filter((d) => (d.dueDay !== undefined || d.firstPaymentDate) && initialBalance(d) > 0)
     .map((debt) => {
-      const date = nextDueDate(debt.dueDay!, today);
+      const first = debt.firstPaymentDate ? parseIsoDate(debt.firstPaymentDate) : null;
+      const date =
+        first && first >= startOfToday ? first : nextDueDate(debt.dueDay ?? first!.getDate(), today);
       return {
         debt,
         date,

@@ -32,6 +32,28 @@ describe("dates", () => {
   });
 });
 
+describe("debts that start later", () => {
+  const today = new Date(2026, 10, 9);
+  const later = { ...sampleFinanceData.debts[2], id: "later", firstPaymentDate: "2027-01-10", dueDay: undefined };
+
+  it("aren't due this month", () => {
+    const withLater = { ...sampleFinanceData, debts: [...sampleFinanceData.debts, later] };
+    expect(summarize(withLater, today).totalMinimumDue).toBe(summarize(sampleFinanceData, today).totalMinimumDue);
+    expect(summarize(withLater, today).totalDebt).toBeGreaterThan(summarize(sampleFinanceData, today).totalDebt);
+  });
+
+  it("show their first payment date as the next due date", () => {
+    const due = upcomingDueDates([later], today);
+    expect(due[0].date).toEqual(new Date(2027, 0, 10));
+    expect(due[0].daysLeft).toBe(62);
+  });
+
+  it("fall back to the first payment's day once started", () => {
+    const started = { ...later, firstPaymentDate: "2026-09-20" };
+    expect(upcomingDueDates([started], today)[0].date).toEqual(new Date(2026, 10, 20));
+  });
+});
+
 describe("payments and progress", () => {
   const data = { ...sampleFinanceData, payments: [] };
 

@@ -11,6 +11,16 @@ describe("rows", () => {
     expect(fromRows(toRows(sampleFinanceData))).toEqual(sampleFinanceData);
   });
 
+  it("round-trips first payment dates and installment totals", () => {
+    const debts = sampleFinanceData.debts.map((d) =>
+      d.kind === "installment"
+        ? { ...d, firstPaymentDate: "2026-06-28", totalInstallments: 12 }
+        : { ...d, firstPaymentDate: "2027-01-15" },
+    );
+    const data = { ...sampleFinanceData, debts };
+    expect(fromRows(toRows(data))).toEqual(data);
+  });
+
   it("stores empty optional fields as null, not undefined", () => {
     const rows = toRows(sampleFinanceData);
     const installment = rows.debts.find((d) => d.kind === "installment")!;

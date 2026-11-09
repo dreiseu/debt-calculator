@@ -15,6 +15,7 @@ import {
   type Strategy,
 } from "@/lib/debt";
 import { budgetWithFutureIncome, planMonthDate } from "@/lib/finance/future";
+import { startMonthsFor } from "@/lib/finance/schedule";
 import { formatMonthYear, summarize } from "@/lib/finance/summary";
 
 const strategies: Record<Strategy, { name: string; description: string }> = {
@@ -60,13 +61,15 @@ export default function PlanPage() {
   const budget = budgetInput ?? suggestedBudget;
   const hasFuture = data.futureIncome.length > 0;
   const useFuture = hasFuture && includeFuture;
+  const startMonths = startMonthsFor(debts);
   const plans = compareStrategies(
     debts,
     useFuture ? budgetWithFutureIncome(budget, data.futureIncome) : budget,
+    startMonths,
   );
   const chosen = plans[strategy];
   const currentIncomeOnly = useFuture
-    ? simulatePayoff(debts, { strategy, monthlyBudget: budget })
+    ? simulatePayoff(debts, { strategy, monthlyBudget: budget, startMonths })
     : null;
   const monthsSooner =
     currentIncomeOnly && chosen.monthsToDebtFree !== null
@@ -168,7 +171,11 @@ export default function PlanPage() {
             {monthsSooner === Infinity
               ? "Your future income is what makes this plan work. Without it you wouldn't be debt-free."
               : monthsSooner > 0
-                ? `Your future income makes you debt-free ${monthsSooner} ${monthsSooner === 1 ? "month" : "months"} sooner and saves ${formatPeso(Math.max(0, currentIncomeOnly.totalInterest - chosen.totalInterest))} in interest.`
+                ? `Your future income makes you debt-free ${monthsSooner} ${monthsSooner === 1 ? "month" : "months"} sooner${
+                    currentIncomeOnly.totalInterest > chosen.totalInterest
+                      ? ` and saves ${formatPeso(currentIncomeOnly.totalInterest - chosen.totalInterest)} in interest`
+                      : ""
+                  }.`
                 : "Your future income arrives after you'd already be debt-free, so it doesn't change the date."}
           </p>
         )}

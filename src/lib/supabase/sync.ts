@@ -12,7 +12,7 @@ export async function loadRows(supabase: SupabaseClient): Promise<Rows> {
     supabase
       .from("debts")
       .select(
-        "id, name, kind, due_day, late_fee, original_balance, position, balance, monthly_interest_rate, min_payment_rate, min_payment_floor, minimum_due_override, installment_amount, installments_remaining, principal, monthly_add_on_rate, term_months, months_paid, paid_ahead",
+        "id, name, kind, due_day, late_fee, original_balance, first_payment_date, position, balance, monthly_interest_rate, min_payment_rate, min_payment_floor, minimum_due_override, installment_amount, installments_remaining, total_installments, principal, monthly_add_on_rate, term_months, months_paid, paid_ahead",
       ),
     supabase.from("payments").select("id, debt_id, paid_on, amount, balance_after"),
   ]);

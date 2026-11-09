@@ -18,6 +18,7 @@ import {
 import { WhatIf } from "@/components/what-if";
 import { initialBalance, initialState, minimumDue } from "@/lib/debt";
 import { debtProgress, recordPayment, removeDebt } from "@/lib/finance/progress";
+import { formatIsoDate, startsLater } from "@/lib/finance/schedule";
 import { ordinal } from "@/lib/finance/summary";
 
 const todayIso = () => {
@@ -109,7 +110,9 @@ export default function DebtDetailPage() {
               tone="ochre"
               className="block font-display text-xl font-semibold"
             />
-            <span className="text-sm text-ink-muted">due this month</span>
+            <span className="text-sm text-ink-muted">
+              {startsLater(debt) ? `first payment, due ${formatIsoDate(debt.firstPaymentDate!)}` : "due this month"}
+            </span>
           </div>
         )}
       </section>

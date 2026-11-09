@@ -9,6 +9,8 @@ interface DebtBase {
   lateFee: Centavos;
   /** Amount owed when the user started tracking; used for progress. */
   originalBalance?: Centavos;
+  /** Date the first payment is due (yyyy-mm-dd). Nothing is due before it. */
+  firstPaymentDate?: string;
 }
 
 /**
@@ -35,6 +37,11 @@ export interface InstallmentDebt extends DebtBase {
   kind: "installment";
   installmentAmount: Centavos;
   installmentsRemaining: number;
+  /**
+   * Total number of installments. With firstPaymentDate set, installments
+   * whose due date has passed are counted as paid automatically.
+   */
+  totalInstallments?: number;
   /** Paid toward the next installment but not yet a full installment. */
   paidAhead?: Centavos;
 }
